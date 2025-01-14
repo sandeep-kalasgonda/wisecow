@@ -36,18 +36,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v2
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          version: 'latest'
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1  # Change to your region
 
-      - name: Configure Kubernetes
+      - name: Install kubectl
         run: |
-          kubectl config set-cluster my-cluster --server=https://<API_SERVER_URL>
-          kubectl config set-credentials my-user --token=${{ secrets.KUBE_TOKEN }}
-          kubectl config set-context my-context --cluster=my-cluster --user=my-user
-          kubectl config use-context my-context
+          curl -o kubectl https://amazon-eks.s3.ap-south-1.amazonaws.com/1.21.1/2021-07-30/bin/linux/amd64/kubectl
+          chmod +x ./kubectl
+          mv ./kubectl /usr/local/bin
 
+      - name: Configure kubeconfig for EKS
+        run: |
+          aws eks --region ap-south-1 update-kubeconfig --name wisecow-cluster
+          
       - name: Deploy to Kubernetes
         run: |
           kubectl set image deployment/wisecow-deployment wisecow=sandeep3414/wisecow:${{ github.sha }} --record
@@ -56,3 +61,4 @@ jobs:
       - name: Verify deployment
         run: |
           kubectl get pods
+          kubectl get svc
