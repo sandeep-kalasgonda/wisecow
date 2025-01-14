@@ -1,67 +1,67 @@
 on:
   push:
     branches:
-      - main
+      - main   # Trigger the workflow when changes are pushed to the main branch
     paths:
-      - '**/*.yaml'
-      - '**/*.dockerfile'
+      - '**/*.yaml'        # Trigger for changes in Kubernetes YAML files
+      - '**/*.dockerfile'  # Trigger for changes in Dockerfiles
 
 jobs:
   build_and_push:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Use Ubuntu runner for the job
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2  # Checkout the repository code
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v2  # Set up Docker Buildx for advanced builds
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v2  # Log in to Docker Hub using credentials stored in GitHub Secrets
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and Push Docker image
         run: |
-          docker build -t sandeep3414/wisecow:${{ github.sha }} .
-          docker push sandeep3414/wisecow:${{ github.sha }}
+          docker build -t sandeep3414/wisecow:${{ github.sha }} .  # Build Docker image with commit hash tag
+          docker push sandeep3414/wisecow:${{ github.sha }}  # Push the image to Docker Hub
 
   deploy_to_kubernetes:
-    needs: build_and_push
-    runs-on: ubuntu-latest
+    needs: build_and_push  # Ensure this job runs after the successful build_and_push job
+    runs-on: ubuntu-latest  # Use Ubuntu runner for the job
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2  # Checkout the repository code
 
       - name: Set up AWS CLI
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v1  # Configure AWS credentials using stored secrets
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: ap-south-1  # Set the AWS region (adjust based on your setup)
 
       - name: Install kubectl
         run: |
-          curl -LO https://dl.k8s.io/release/v1.24.0/bin/linux/amd64/kubectl
-          chmod +x ./kubectl
-          mv ./kubectl /usr/local/bin/kubectl
+          curl -LO https://dl.k8s.io/release/v1.24.0/bin/linux/amd64/kubectl  # Download kubectl
+          chmod +x ./kubectl  # Make kubectl executable
+          mv ./kubectl /usr/local/bin/kubectl  # Move kubectl to the system path
 
       - name: Configure kubeconfig for EKS
         run: |
-          aws eks --region ap-south-1 update-kubeconfig --name wisecow-cluster
+          aws eks --region ap-south-1 update-kubeconfig --name wisecow-cluster  # Configure kubeconfig to access EKS cluster
 
       - name: Check kubectl version and EKS connection
         run: |
-          kubectl version --short
-          kubectl get nodes
+          kubectl version --short  # Check kubectl version
+          kubectl get nodes  # Verify connection to the EKS cluster
 
       - name: Deploy to Kubernetes
         run: |
-          kubectl set image deployment/wisecow-deployment wisecow=sandeep3414/wisecow:${{ github.sha }} --record
-          kubectl rollout status deployment/wisecow-deployment
+          kubectl set image deployment/wisecow-deployment wisecow=sandeep3414/wisecow:${{ github.sha }} --record  # Update image in deployment
+          kubectl rollout status deployment/wisecow-deployment  # Wait for deployment rollout to complete
 
       - name: Verify deployment
         run: |
-          kubectl get pods
-          kubectl get svc
+          kubectl get pods  # Check the status of the deployed pods
+          kubectl get svc   # Check the services to verify if they are up and running
